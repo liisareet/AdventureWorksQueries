@@ -1,0 +1,111 @@
+-- Sales by SubCategory
+WITH
+  salesordercostdetail AS (
+  WITH
+    categoryinformation AS (
+    SELECT
+      product.ProductID,
+      product.Name AS ProductName,
+      product.StandardCost,
+      product.ListPrice,
+      product.ProductSubcategoryID,
+      productsubcategory.Name AS SubcategoryName,
+      productcategory.Name AS CategoryName
+    FROM
+      `adwentureworks_db.product` AS product
+    LEFT JOIN
+      `adwentureworks_db.productsubcategory` AS productsubcategory
+    ON
+      product.ProductSubcategoryID = productsubcategory.ProductSubcategoryID
+    LEFT JOIN
+      `adwentureworks_db.productcategory` AS productcategory
+    ON
+      productsubcategory.ProductCategoryID = productcategory.ProductCategoryID)
+  SELECT
+    salesorderdetail.SalesOrderID,
+    salesorderheader.OrderDate,
+    salesorderheader.SalespersonID,
+    salesorderdetail.SalesOrderDetailID,
+    salesorderdetail.OrderQty,
+    salesorderdetail.ProductID,
+    salesorderdetail.UnitPrice,
+    salesorderdetail.UnitPriceDiscount,
+    salesorderdetail.LineTotal,
+    categoryinformation.StandardCost,
+    (categoryinformation.StandardCost*salesorderdetail.OrderQty) AS LineCost,
+    (salesorderdetail.LineTotal-(salesorderdetail.OrderQty*categoryinformation.standardcost)) AS Profit,
+    categoryinformation.ProductName,
+    categoryinformation.ListPrice,
+    categoryinformation.SubcategoryName,
+    categoryinformation.CategoryName
+  FROM
+    `adwentureworks_db.salesorderdetail` AS salesorderdetail
+  LEFT JOIN
+    categoryinformation
+  ON
+    salesorderdetail.ProductID = categoryinformation.ProductId
+  LEFT JOIN (
+    SELECT
+      SalesOrderID,
+      SalesPersonID,
+      OrderDate
+    FROM
+      `adwentureworks_db.salesorderheader`) AS salesorderheader
+  ON
+    salesorderdetail.SalesOrderID = salesorderheader.SalesOrderID)
+SELECT
+  salesordercostdetail.SubcategoryName,
+  salesordercostdetail.CategoryName,
+  SUM(LineTotal) AS LineTotal,
+  SUM(LineCost) AS LineCost,
+  SUM(Profit) AS Profit
+FROM
+  salesordercostdetail
+GROUP BY
+  salesordercostdetail.SubcategoryName,
+  salesordercostdetail.CategoryName
+
+
+
+
+
+
+-- Cost Calculation - This result I joined with the initial sales data from SalesOrderHeader on SalesOrderId
+
+WITH
+  CostCalculation AS (
+  SELECT
+    SalesOrderDetail.SalesOrderID,
+    SalesOrderDetail.SalesOrderDetailID,
+    SalesOrderDetail.OrderQty,
+    SalesOrderDetail.ProductID,
+    SalesOrderDetail.UnitPrice,
+    Product.StandardCost,
+    (SalesOrderDetail.OrderQty)*(Product.StandardCost) AS LineTotalCost,
+    SalesOrderDetail.UnitPriceDiscount,
+    SalesOrderDetail.LineTotal,
+    (SalesOrderDetail.LineTotal) - ((SalesOrderDetail.OrderQty)*(Product.StandardCost)) AS Profit
+  FROM (
+    SELECT
+      SalesOrderID,
+      SalesOrderDetailID,
+      OrderQty,
+      ProductID,
+      UnitPrice,
+      UnitPriceDiscount,
+      LineTotal
+    FROM
+      `tc-da-1.adwentureworks_db.salesorderdetail`) AS SalesOrderDetail
+  JOIN
+    `adwentureworks_db.product` AS Product
+  ON
+    SalesOrderDetail.ProductID = Product.ProductID)
+SELECT
+  SalesOrderID,
+  SUM(LineTotalCost) AS TotalCost,
+  SUM(Profit) AS Profit
+FROM
+  CostCalculation
+GROUP BY
+  SalesOrderID
+
